@@ -1,5 +1,16 @@
 import { loadConfig } from './config';
+import { startServer } from './server';
 
 const config = loadConfig();
-// HTTP / WS / MCP server is wired up in T5–T6.
-console.log(`example-map server config: ${JSON.stringify(config)}`);
+const server = await startServer(config);
+
+console.log(`Example Map running at ${server.url}`);
+console.log(`  MCP endpoint: ${server.url}/mcp`);
+console.log(`  Data dir:     ${config.dataDir}`);
+
+const shutdown = async () => {
+  await server.close();
+  process.exit(0);
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
