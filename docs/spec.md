@@ -181,35 +181,23 @@ MCP initialize 時回傳 `instructions`，摘要 assistant 行為準則：
 
 ### WebSocket `/ws`
 
-Client → Server：
+Client → Server（`ClientMessage`）：
 
 ```ts
-{
-  type: ('open', boardId);
-} // 訂閱並設為 active
-{
-  type: ('command', boardId, requestId, command);
-}
+type ClientMessage =
+  | { type: 'open'; boardId: string } // 訂閱並設為 active
+  | { type: 'command'; boardId: string; requestId: string; command: Command };
 ```
 
-Server → Client：
+Server → Client（`ServerMessage`）：
 
 ```ts
-{
-  type: ('snapshot', board);
-} // open 之後
-{
-  type: ('updated', board, actor, command);
-} // 任何來源的變更
-{
-  type: 'boardsChanged';
-} // 列表有變，UI 重新 GET
-{
-  type: ('activeChanged', boardId);
-} // AI create/open board 時，UI 跟著切換
-{
-  type: ('error', requestId, message);
-}
+type ServerMessage =
+  | { type: 'snapshot'; board: Board } // open 之後
+  | { type: 'updated'; board: Board; command: Command; actor: Actor; affectedIds: string[] } // 任何來源的變更
+  | { type: 'boardsChanged' } // 列表有變，UI 重新 GET
+  | { type: 'activeChanged'; boardId: string | null; actor: Actor } // UI 只在 actor 為 ai 時跟著切換
+  | { type: 'error'; requestId?: string; message: string };
 ```
 
 Board 很小（數十張卡），每次變更都送整張 board，前端直接替換 state，不做 diff。
@@ -226,7 +214,7 @@ Board 很小（數十張卡），每次變更都送整張 board，前端直接�
   - 每欄底部「+ Example」，Rules 列尾端「+ Rule」，Questions 欄「+ Question」
   - 卡片 hover 顯示刪除；Question 顯示 resolve／reopen
   - dnd-kit：拖拉 Rule 欄重排；拖拉 Example 在欄內重排或移到其他欄
-- **AI 可見性**：`actor: "ai"` 的變更，受影響的卡片短暫高亮（約 2 秒）。
+- **AI 可見性**：`actor: "ai"` 的變更，依 `updated` 訊息中的 `affectedIds` 將受影響的卡片短暫高亮（約 2 秒）。
 - **連線狀態**：WS 斷線時顯示提示並自動重連，重連後重新 `open`。
 
 ## 9. 指令
@@ -253,13 +241,13 @@ Board 很小（數十張卡），每次變更都送整張 board，前端直接�
 
 ## 11. MVP 驗收條件
 
-- [ ] `pnpm start` 後，瀏覽器在 `http://127.0.0.1:4319` 看到畫板
+- [x] `pnpm start` 後，瀏覽器在 `http://127.0.0.1:4319` 看到畫板
 - [ ] Claude Code 以 `claude mcp add` 連上後，能透過對話建立 board、Story、Rules、Examples、Questions
-- [ ] AI 的變更 1 秒內出現在 UI，且有高亮
-- [ ] UI 可完成所有 command 對應的手動操作（含拖拉）
-- [ ] 人類手動修改後，AI 的 `get_board` 能讀到並回傳 hints
-- [ ] 重啟 server 後資料仍在
-- [ ] `pnpm test`、`pnpm test:e2e`、`pnpm typecheck` 全部通過
+- [x] AI 的變更 1 秒內出現在 UI，且有高亮
+- [x] UI 可完成所有 command 對應的手動操作（含拖拉）
+- [x] 人類手動修改後，AI 的 `get_board` 能讀到並回傳 hints
+- [x] 重啟 server 後資料仍在
+- [x] `pnpm test`、`pnpm test:e2e`、`pnpm typecheck` 全部通過
 
 ## 12. MVP 之後（不在本次範圍）
 

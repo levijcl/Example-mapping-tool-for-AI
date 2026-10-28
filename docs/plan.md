@@ -74,7 +74,7 @@
 
 ### T10. AI 變更高亮
 
-- `actor: "ai"` 的變更：比對前後兩版 board，找出受影響的卡片，高亮約 2 秒
+- `actor: "ai"` 的變更：用 `applyCommand` 回傳、隨 `updated` 廣播的 `affectedIds` 決定受影響的卡片，高亮約 2 秒
 - **驗收**：AI 新增／修改的卡片有高亮，人類自己的修改沒有
 
 ## Phase 4 — 收尾
