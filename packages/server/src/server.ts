@@ -4,6 +4,7 @@ import { getRequestListener } from '@hono/node-server';
 import { BoardStore } from './board-store';
 import type { ServerConfig } from './config';
 import { createHttpApp } from './http';
+import { isLocalHost, isLocalOrigin } from './local-only';
 import { createBoardSocketServer } from './ws';
 
 export type RunningServer = {
@@ -26,7 +27,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   });
 
   server.on('upgrade', (req, socket, head) => {
-    if (new URL(req.url ?? '/', 'http://localhost').pathname === '/ws') {
+    const isWs = new URL(req.url ?? '/', 'http://localhost').pathname === '/ws';
+    if (isWs && isLocalHost(req.headers.host) && isLocalOrigin(req.headers.origin)) {
       sockets.handleUpgrade(req, socket, head);
     } else {
       socket.destroy();
