@@ -37,14 +37,14 @@
 
 ### 技術棧
 
-| 層 | 選擇 |
-|---|---|
-| Monorepo | TypeScript + pnpm workspace |
-| 共用模型 | zod（schema 即型別，同時供 MCP input schema 與 WS 驗證使用） |
-| Server | Node 22 + Hono + `ws` + `@modelcontextprotocol/sdk`（Streamable HTTP） |
-| Web | Vite + React + Tailwind + dnd-kit |
-| 持久化 | `boards/<boardId>.json`（atomic write：寫 tmp 檔後 rename） |
-| 測試 | Vitest（shared / server）、Playwright（E2E） |
+| 層       | 選擇                                                                   |
+| -------- | ---------------------------------------------------------------------- |
+| Monorepo | TypeScript + pnpm workspace                                            |
+| 共用模型 | zod（schema 即型別，同時供 MCP input schema 與 WS 驗證使用）           |
+| Server   | Node 22 + Hono + `ws` + `@modelcontextprotocol/sdk`（Streamable HTTP） |
+| Web      | Vite + React + Tailwind + dnd-kit                                      |
+| 持久化   | `boards/<boardId>.json`（atomic write：寫 tmp 檔後 rename）            |
+| 測試     | Vitest（shared / server）、Playwright（E2E）                           |
 
 ### 專案結構
 
@@ -62,23 +62,24 @@ boards/     # 執行時資料（.gitignore）
 
 ```ts
 type Board = {
-  id: string;            // "b_" + 8 碼 nanoid
+  id: string; // "b_" + 8 碼 nanoid
   title: string;
-  story: string;         // 黃卡，可為空字串
-  rules: Rule[];         // 順序即顯示順序
+  story: string; // 黃卡，可為空字串
+  rules: Rule[]; // 順序即顯示順序
   questions: Question[];
-  version: number;       // 每套用一個 command +1
-  createdAt: string;     // ISO
+  version: number; // 每套用一個 command +1
+  createdAt: string; // ISO
   updatedAt: string;
 };
 
-type Rule     = { id: string; text: string; examples: Example[] };   // "r_..."
-type Example  = { id: string; text: string };                        // "e_..."
-type Question = {                                                    // "q_..."
+type Rule = { id: string; text: string; examples: Example[] }; // "r_..."
+type Example = { id: string; text: string }; // "e_..."
+type Question = {
+  // "q_..."
   id: string;
   text: string;
-  status: "open" | "resolved";
-  resolution?: string;   // 解決時的答案／結論
+  status: 'open' | 'resolved';
+  resolution?: string; // 解決時的答案／結論
 };
 ```
 
@@ -90,23 +91,23 @@ type Question = {                                                    // "q_..."
 
 `applyCommand(board, command) → board | Error` 是 `shared` 中的純函式，server 與測試共用。
 
-| Command | 參數 | 說明 |
-|---|---|---|
-| `setTitle` | `title` | |
-| `setStory` | `text` | |
-| `addRule` | `text`, `index?`, `examples?: string[]` | 可一次帶入多個 examples |
-| `updateRule` | `ruleId`, `text` | |
-| `deleteRule` | `ruleId` | 連帶刪除 examples |
-| `moveRule` | `ruleId`, `toIndex` | |
-| `addExample` | `ruleId`, `text`, `index?` | |
-| `updateExample` | `exampleId`, `text` | |
-| `deleteExample` | `exampleId` | |
-| `moveExample` | `exampleId`, `toRuleId`, `toIndex` | 可跨 Rule |
-| `addQuestion` | `text` | |
-| `updateQuestion` | `questionId`, `text` | |
-| `resolveQuestion` | `questionId`, `resolution?` | |
-| `reopenQuestion` | `questionId` | |
-| `deleteQuestion` | `questionId` | |
+| Command           | 參數                                    | 說明                    |
+| ----------------- | --------------------------------------- | ----------------------- |
+| `setTitle`        | `title`                                 |                         |
+| `setStory`        | `text`                                  |                         |
+| `addRule`         | `text`, `index?`, `examples?: string[]` | 可一次帶入多個 examples |
+| `updateRule`      | `ruleId`, `text`                        |                         |
+| `deleteRule`      | `ruleId`                                | 連帶刪除 examples       |
+| `moveRule`        | `ruleId`, `toIndex`                     |                         |
+| `addExample`      | `ruleId`, `text`, `index?`              |                         |
+| `updateExample`   | `exampleId`, `text`                     |                         |
+| `deleteExample`   | `exampleId`                             |                         |
+| `moveExample`     | `exampleId`, `toRuleId`, `toIndex`      | 可跨 Rule               |
+| `addQuestion`     | `text`                                  |                         |
+| `updateQuestion`  | `questionId`, `text`                    |                         |
+| `resolveQuestion` | `questionId`, `resolution?`             |                         |
+| `reopenQuestion`  | `questionId`                            |                         |
+| `deleteQuestion`  | `questionId`                            |                         |
 
 每個 command 套用時附帶 `actor: "human" | "ai"`，隨廣播送出（UI 用來標示 AI 剛改了什麼）。
 
@@ -116,14 +117,14 @@ type Question = {                                                    // "q_..."
 
 `analyzeBoard(board) → Hint[]`，純函式，結果附在 `get_board` 回傳中。
 
-| 條件 | Hint |
-|---|---|
-| Story 為空 | 先釐清 story |
-| 沒有任何 Rule | 開始找出 acceptance rules |
-| Rule 沒有 Example | `Rule r_x has no examples` |
-| Rule 的 Examples > 6 | 這條 rule 可能太大，考慮拆分 |
-| Rules > 8 | Story 可能太大，考慮拆分 story |
-| Open questions > 5 | Story 可能還沒準備好進開發 |
+| 條件                 | Hint                           |
+| -------------------- | ------------------------------ |
+| Story 為空           | 先釐清 story                   |
+| 沒有任何 Rule        | 開始找出 acceptance rules      |
+| Rule 沒有 Example    | `Rule r_x has no examples`     |
+| Rule 的 Examples > 6 | 這條 rule 可能太大，考慮拆分   |
+| Rules > 8            | Story 可能太大，考慮拆分 story |
+| Open questions > 5   | Story 可能還沒準備好進開發     |
 
 門檻集中定義為常數，方便調整。
 
@@ -138,18 +139,18 @@ Server 維護 `activeBoardId`：最近一次在 UI 開啟、或透過 MCP 建立
 
 ### Tools
 
-| Tool | 參數 | 回傳 |
-|---|---|---|
-| `list_boards` | — | `[{id, title, updatedAt, ruleCount, openQuestionCount}]`，標示 active |
-| `create_board` | `title`, `story?` | 新 board（並設為 active，UI 自動切換過去） |
-| `open_board` | `boardId` | 設為 active，回傳同 `get_board` |
-| `get_board` | `boardId?` | 完整 board + `hints` |
-| `set_story` | `text`, `boardId?` | |
-| `add_rule` | `text`, `examples?`, `index?`, `boardId?` | 新 rule（含 example IDs） |
-| `update_rule` / `delete_rule` / `move_rule` | 對應 command | |
-| `add_example` / `update_example` / `delete_example` / `move_example` | 對應 command | |
-| `add_question` / `resolve_question` / `reopen_question` / `delete_question` | 對應 command | |
-| `export_markdown` | `boardId?` | Markdown 文字 |
+| Tool                                                                        | 參數                                      | 回傳                                                                  |
+| --------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| `list_boards`                                                               | —                                         | `[{id, title, updatedAt, ruleCount, openQuestionCount}]`，標示 active |
+| `create_board`                                                              | `title`, `story?`                         | 新 board（並設為 active，UI 自動切換過去）                            |
+| `open_board`                                                                | `boardId`                                 | 設為 active，回傳同 `get_board`                                       |
+| `get_board`                                                                 | `boardId?`                                | 完整 board + `hints`                                                  |
+| `set_story`                                                                 | `text`, `boardId?`                        |                                                                       |
+| `add_rule`                                                                  | `text`, `examples?`, `index?`, `boardId?` | 新 rule（含 example IDs）                                             |
+| `update_rule` / `delete_rule` / `move_rule`                                 | 對應 command                              |                                                                       |
+| `add_example` / `update_example` / `delete_example` / `move_example`        | 對應 command                              |                                                                       |
+| `add_question` / `resolve_question` / `reopen_question` / `delete_question` | 對應 command                              |                                                                       |
+| `export_markdown`                                                           | `boardId?`                                | Markdown 文字                                                         |
 
 - 變更類工具回傳：受影響的實體（含新 ID）+ `version`。為避免 context 膨脹，不回傳整張 board。
 - 每個工具的 description 用語意描述「何時使用」，例如 `add_question`：「當你或使用者對規則有不確定、需要 PO/業務確認的地方時使用」。
@@ -172,10 +173,10 @@ MCP initialize 時回傳 `instructions`，摘要 assistant 行為準則：
 
 ### REST
 
-| Method | Path | 說明 |
-|---|---|---|
-| GET | `/api/boards` | board 列表 |
-| POST | `/api/boards` | 建立 `{title}` |
+| Method | Path              | 說明                           |
+| ------ | ----------------- | ------------------------------ |
+| GET    | `/api/boards`     | board 列表                     |
+| POST   | `/api/boards`     | 建立 `{title}`                 |
 | DELETE | `/api/boards/:id` | 刪除（僅 UI 提供，MCP 不提供） |
 
 ### WebSocket `/ws`
@@ -183,18 +184,32 @@ MCP initialize 時回傳 `instructions`，摘要 assistant 行為準則：
 Client → Server：
 
 ```ts
-{ type: "open", boardId }                              // 訂閱並設為 active
-{ type: "command", boardId, requestId, command }
+{
+  type: ('open', boardId);
+} // 訂閱並設為 active
+{
+  type: ('command', boardId, requestId, command);
+}
 ```
 
 Server → Client：
 
 ```ts
-{ type: "snapshot", board }                            // open 之後
-{ type: "updated", board, actor, command }            // 任何來源的變更
-{ type: "boardsChanged" }                              // 列表有變，UI 重新 GET
-{ type: "activeChanged", boardId }                     // AI create/open board 時，UI 跟著切換
-{ type: "error", requestId, message }
+{
+  type: ('snapshot', board);
+} // open 之後
+{
+  type: ('updated', board, actor, command);
+} // 任何來源的變更
+{
+  type: 'boardsChanged';
+} // 列表有變，UI 重新 GET
+{
+  type: ('activeChanged', boardId);
+} // AI create/open board 時，UI 跟著切換
+{
+  type: ('error', requestId, message);
+}
 ```
 
 Board 很小（數十張卡），每次變更都送整張 board，前端直接替換 state，不做 diff。
@@ -216,14 +231,14 @@ Board 很小（數十張卡），每次變更都送整張 board，前端直接�
 
 ## 9. 指令
 
-| 指令 | 說明 |
-|---|---|
-| `pnpm install` | |
-| `pnpm dev` | Server（watch）+ Vite dev server |
-| `pnpm start` | Build web 後啟動 server，在 4319 提供 UI |
-| `pnpm test` | Vitest |
-| `pnpm test:e2e` | Playwright |
-| `pnpm typecheck` / `pnpm lint` | |
+| 指令                           | 說明                                     |
+| ------------------------------ | ---------------------------------------- |
+| `pnpm install`                 |                                          |
+| `pnpm dev`                     | Server（watch）+ Vite dev server         |
+| `pnpm start`                   | Build web 後啟動 server，在 4319 提供 UI |
+| `pnpm test`                    | Vitest                                   |
+| `pnpm test:e2e`                | Playwright                               |
+| `pnpm typecheck` / `pnpm lint` |                                          |
 
 環境變數：`PORT`（預設 4319）、`DATA_DIR`（預設 `./boards`）。
 
