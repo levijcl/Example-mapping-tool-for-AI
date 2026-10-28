@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   closestCenter,
   closestCorners,
@@ -11,7 +11,7 @@ import {
   type CollisionDetection,
 } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
-import type { Board, Command } from '@example-map/shared';
+import type { Board, Command, HistoryState } from '@example-map/shared';
 import { dropToCommand, isExampleId, isRuleId } from '../dnd';
 import { AddCard } from './AddCard';
 import { Card } from './Card';
@@ -23,7 +23,13 @@ type Props = {
   board: Board;
   send: (command: Command) => void;
   highlighted: ReadonlySet<string>;
+  history: HistoryState;
+  onUndo: () => void;
+  onRedo: () => void;
 };
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = isMac ? '⌘' : 'Ctrl+';
 
 /** Rules only collide with rules; examples prefer the example under the pointer, then a rule column. */
 const collisionDetection: CollisionDetection = (args) => {
@@ -42,7 +48,7 @@ const collisionDetection: CollisionDetection = (args) => {
   return closestCorners(args);
 };
 
-export function BoardView({ board, send, highlighted }: Props) {
+export function BoardView({ board, send, highlighted, history, onUndo, onRedo }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const dragged = activeId ? findCardText(board, activeId) : null;
@@ -51,12 +57,32 @@ export function BoardView({ board, send, highlighted }: Props) {
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex flex-col gap-3 border-b border-stone-200 px-6 py-4">
-          <EditableText
-            label="board title"
-            value={board.title}
-            onSave={(title) => send({ type: 'setTitle', title })}
-            className={`text-xl font-semibold ${highlighted.has(board.id) ? 'ai-highlight' : ''}`}
-          />
+          <div className="flex items-start gap-4">
+            <EditableText
+              label="board title"
+              value={board.title}
+              onSave={(title) => send({ type: 'setTitle', title })}
+              className={`min-w-0 flex-1 text-xl font-semibold ${highlighted.has(board.id) ? 'ai-highlight' : ''}`}
+            />
+            <div className="flex shrink-0 gap-1">
+              <HistoryButton
+                label="Undo"
+                shortcut={`${MOD}Z`}
+                disabled={!history.canUndo}
+                onClick={onUndo}
+              >
+                ↶ Undo
+              </HistoryButton>
+              <HistoryButton
+                label="Redo"
+                shortcut={`${MOD}⇧Z`}
+                disabled={!history.canRedo}
+                onClick={onRedo}
+              >
+                ↷ Redo
+              </HistoryButton>
+            </div>
+          </div>
           <Card
             variant="story"
             data-testid="story"
@@ -120,6 +146,33 @@ export function BoardView({ board, send, highlighted }: Props) {
 
       <QuestionsColumn questions={board.questions} send={send} highlighted={highlighted} />
     </div>
+  );
+}
+
+function HistoryButton({
+  label,
+  shortcut,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  shortcut: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={`${label} (${shortcut})`}
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-md border border-stone-300 bg-white px-2.5 py-1 text-sm text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
+    >
+      {children}
+    </button>
   );
 }
 

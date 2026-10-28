@@ -300,11 +300,11 @@ Board 很小（數十張卡），每次變更都送整張 board，前端直接�
 
 ### 驗收條件
 
-- [ ] UI 按 Undo／Cmd+Z 撤銷最新一步（不論 human 或 AI），Redo 可重做；按鈕依狀態 enabled／disabled
-- [ ] 編輯文字時 Cmd+Z 不會觸發畫板 undo
-- [ ] AI 透過 `undo`／`redo` 工具操作，UI 即時更新並高亮
-- [ ] 新修改後 redo 清空；超過 100 步丟棄最舊
-- [ ] Undo 後的內容立即寫入磁碟，重啟後仍是 undo 後的內容（歷史本身清空）
+- [x] UI 按 Undo／Cmd+Z 撤銷最新一步（不論 human 或 AI），Redo 可重做；按鈕依狀態 enabled／disabled
+- [x] 編輯文字時 Cmd+Z 不會觸發畫板 undo
+- [x] AI 透過 `undo`／`redo` 工具操作，UI 即時更新並高亮
+- [x] 新修改後 redo 清空；超過 100 步丟棄最舊
+- [x] Undo 後的內容立即寫入磁碟，重啟後仍是 undo 後的內容（歷史本身清空）
 
 ## 15. 已知事項：資料「消失」的排查
 

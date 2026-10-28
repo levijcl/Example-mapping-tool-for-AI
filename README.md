@@ -50,6 +50,7 @@ AI 會建立 board、提出 rules 與具體 examples，並把不確定的地方�
 
 - 直接在畫板上點擊文字編輯（Enter 儲存、Shift+Enter 換行、Esc 取消）
 - 拖拉 rule 欄位重新排序，拖拉 example 到其他 rule
+- 用 Undo／Redo 按鈕或 Cmd/Ctrl+Z、Cmd/Ctrl+Shift+Z 撤銷／重做（你和 AI 共用一條歷史，一個操作一步；也可以直接請 AI「復原剛剛那一步」）
 - 把 question 標為已解決並填入答案，再請 AI「根據答案更新 rules」
 
 AI 的操作預設作用在**畫面上目前開啟的 board**。
@@ -63,6 +64,7 @@ AI 的操作預設作用在**畫面上目前開啟的 board**。
 | Rules     | `add_rule`（可同時帶 examples）、`update_rule`、`delete_rule`、`move_rule`                  |
 | Examples  | `add_example`、`update_example`、`delete_example`、`move_example`                           |
 | Questions | `add_question`、`update_question`、`resolve_question`、`reopen_question`、`delete_question` |
+| History   | `undo`、`redo`                                                                              |
 
 `get_board` 會附上 hints（例如某條 rule 沒有 example、open questions 太多），讓 AI 主動提醒你。
 刪除整個 board 只能在 UI 上做。
@@ -89,6 +91,15 @@ packages/
 e2e/        Playwright：AI ↔ 瀏覽器同步、手動編輯、拖拉
 docs/       spec 與實作計畫
 ```
+
+### 資料存在哪裡？
+
+每個修改都會立即寫入 `DATA_DIR`（預設 `<repo>/boards`）。如果重啟後內容「不見了」，先檢查：
+
+1. Server 啟動時印出的 `Data dir:` 是否是你預期的目錄。
+2. Port 4319 上是不是別的 server：`lsof -nP -iTCP:4319 -sTCP:LISTEN`。
+
+Undo 歷史只存在記憶體，重啟後清空（board 內容不受影響）。
 
 ### 安全性
 

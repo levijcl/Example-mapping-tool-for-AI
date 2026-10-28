@@ -3,6 +3,7 @@ import type { BoardSummary } from '@example-map/shared';
 import { api } from './api';
 import { BoardView } from './components/BoardView';
 import { Sidebar } from './components/Sidebar';
+import { boardShortcut } from './shortcuts';
 import { useBoardSocket } from './useBoardSocket';
 import { useHighlights } from './useHighlights';
 
@@ -28,7 +29,7 @@ export function App() {
     }
   }, []);
 
-  const { status, board, send } = useBoardSocket(currentId, {
+  const { status, board, history, send, undo, redo } = useBoardSocket(currentId, {
     onBoardsChanged: () => void refreshBoards(),
     // Follow the AI when it creates or opens a board; ignore our own (human) navigation.
     onActiveChanged: (boardId, actor) => {
@@ -37,6 +38,19 @@ export function App() {
     onAiChange: flash,
     onError: setError,
   });
+
+  useEffect(() => {
+    if (!board) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const action = boardShortcut(event);
+      if (!action) return;
+      event.preventDefault();
+      if (action === 'undo' && history.canUndo) undo();
+      if (action === 'redo' && history.canRedo) redo();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [board, history, undo, redo]);
 
   useEffect(() => {
     if (!error) return;
@@ -84,7 +98,14 @@ export function App() {
           </div>
         )}
         {board ? (
-          <BoardView board={board} send={send} highlighted={highlighted} />
+          <BoardView
+            board={board}
+            send={send}
+            highlighted={highlighted}
+            history={history}
+            onUndo={undo}
+            onRedo={redo}
+          />
         ) : boards.length === 0 ? (
           <EmptyState />
         ) : null}

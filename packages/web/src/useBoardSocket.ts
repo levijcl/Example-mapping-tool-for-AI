@@ -5,6 +5,7 @@ import {
   type Board,
   type ClientMessage,
   type Command,
+  type HistoryState,
   type ServerMessage,
 } from '@example-map/shared';
 
@@ -18,6 +19,8 @@ type Handlers = {
 };
 
 const RECONNECT_DELAY_MS = 1000;
+
+const NO_HISTORY: HistoryState = { canUndo: false, canRedo: false };
 
 /** Commands applied locally before the server confirms, so drag-and-drop doesn't snap back. */
 const OPTIMISTIC: ReadonlySet<Command['type']> = new Set(['moveRule', 'moveExample']);
@@ -34,6 +37,7 @@ function socketUrl(): string {
 export function useBoardSocket(boardId: string | null, handlers: Handlers) {
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [board, setBoard] = useState<Board | null>(null);
+  const [history, setHistory] = useState<HistoryState>(NO_HISTORY);
   const wsRef = useRef<WebSocket | null>(null);
   const boardIdRef = useRef(boardId);
   const handlersRef = useRef(handlers);
@@ -58,11 +62,14 @@ export function useBoardSocket(boardId: string | null, handlers: Handlers) {
       const h = handlersRef.current;
       switch (message.type) {
         case 'snapshot':
-          if (message.board.id === boardIdRef.current) setBoard(message.board);
+          if (message.board.id !== boardIdRef.current) break;
+          setBoard(message.board);
+          setHistory(message.history);
           break;
         case 'updated':
           if (message.board.id !== boardIdRef.current) break;
           setBoard(message.board);
+          setHistory(message.history);
           if (message.actor === 'ai') h.onAiChange(message.affectedIds);
           break;
         case 'boardsChanged':
@@ -129,6 +136,25 @@ export function useBoardSocket(boardId: string | null, handlers: Handlers) {
     [sendMessage],
   );
 
+  const travel = useCallback(
+    (direction: 'undo' | 'redo') => {
+      const id = boardIdRef.current;
+      if (!id) return;
+      if (!sendMessage({ type: direction, boardId: id })) {
+        handlersRef.current.onError('Not connected to the server.');
+      }
+    },
+    [sendMessage],
+  );
+
   // A board from a previous subscription is never shown for a different boardId.
-  return { status, board: board?.id === boardId ? board : null, send };
+  const current = board?.id === boardId ? board : null;
+  return {
+    status,
+    board: current,
+    history: current ? history : NO_HISTORY,
+    send,
+    undo: useCallback(() => travel('undo'), [travel]),
+    redo: useCallback(() => travel('redo'), [travel]),
+  };
 }
