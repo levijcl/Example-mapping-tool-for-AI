@@ -1,1 +1,22 @@
 @import 'tailwindcss';
+
+@keyframes ai-highlight {
+  0% {
+    box-shadow: 0 0 0 4px rgb(139 92 246 / 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgb(139 92 246 / 0);
+  }
+}
+
+/* Cards changed by the AI glow briefly (see useHighlights). */
+.ai-highlight {
+  animation: ai-highlight 2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-highlight {
+    animation: none;
+    outline: 2px solid rgb(139 92 246);
+  }
+}
