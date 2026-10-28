@@ -49,6 +49,8 @@ describe('MCP server', () => {
         'resolve_question',
         'set_story',
         'set_title',
+        'undo',
+        'redo',
         'update_example',
         'update_question',
         'update_rule',
@@ -144,6 +146,36 @@ describe('MCP server', () => {
     const list = (await call('list_boards')).json();
     expect(list.activeBoardId).toBe(first.id);
     expect(list.boards).toHaveLength(2);
+  });
+
+  it('undoes and redoes through the shared history, notifying the UI', async () => {
+    const { board } = (await call('create_board', { title: 'Coupons' })).json() as { board: Board };
+    const ws = await TestSocket.connect(server.url);
+    try {
+      ws.send({ type: 'open', boardId: board.id });
+      expect((await ws.next('snapshot')).history).toEqual({ canUndo: false, canRedo: false });
+
+      server.store.apply(board.id, { type: 'addQuestion', text: 'from human' }, 'human');
+      await ws.next('updated');
+
+      const undone = (await call('undo')).json();
+      expect(undone).toMatchObject({ canUndo: false, canRedo: true, changed: [] });
+      const update = await ws.next('updated');
+      expect(update).toMatchObject({
+        actor: 'ai',
+        change: { type: 'undo' },
+        history: { canRedo: true },
+      });
+      expect(update.board.questions).toEqual([]);
+
+      const redone = (await call('redo')).json();
+      expect(redone.changed).toEqual([
+        expect.objectContaining({ kind: 'question', text: 'from human' }),
+      ]);
+      expect(await call('redo')).toMatchObject({ isError: true, text: 'Nothing to redo.' });
+    } finally {
+      ws.close();
+    }
   });
 
   it('exports markdown', async () => {

@@ -8,7 +8,7 @@ import {
   type Board,
   type Command,
 } from '@example-map/shared';
-import type { BoardStore } from './board-store';
+import type { BoardStore, ChangeResult } from './board-store';
 
 export const SERVER_INSTRUCTIONS = `
 You are an Example Mapping facilitator working on a shared board that a human is watching live in their browser.
@@ -29,6 +29,7 @@ How to work:
 - Keep each card short: one rule, one example, or one question per card.
 - Do not delete or rewrite content the human created unless they ask you to.
 - Prefer add_rule with its examples argument to add a rule and its first examples in one call.
+- If the human says your last change was wrong, you can use undo (one step per tool call). The undo history is shared with the human, so check get_board first.
 - Reply to the human in the language they use; card text should follow the language of the existing board.
 `.trim();
 
@@ -84,16 +85,29 @@ export function createMcpServer(store: BoardStore): McpServer {
         if (!target.ok) return fail(target.error);
         // The SDK has already validated `rest` against `shape`.
         const command = toCommand(rest as z.infer<z.ZodObject<Shape>>);
-        const result = store.apply(target.board.id, command, 'ai');
-        if (!result.ok) return fail(result.error);
-        return ok({
-          boardId: result.board.id,
-          version: result.board.version,
-          changed: result.affectedIds.map((id) => findEntity(result.board, id)),
-        });
+        return changeResult(store.apply(target.board.id, command, 'ai'));
       },
     );
   };
+
+  for (const direction of ['undo', 'redo'] as const) {
+    server.registerTool(
+      direction,
+      {
+        description:
+          direction === 'undo'
+            ? 'Undo the most recent change to the board. The history is shared with the human, so this ' +
+              'may undo their edit: call get_board first, and tell the human what you undid.'
+            : 'Redo the most recently undone change. Tell the human what you redid.',
+        inputSchema: { boardId: boardIdArg },
+      },
+      async ({ boardId }) => {
+        const target = resolveBoard(boardId);
+        if (!target.ok) return fail(target.error);
+        return changeResult(store[direction](target.board.id, 'ai'));
+      },
+    );
+  }
 
   server.registerTool(
     'list_boards',
@@ -309,6 +323,16 @@ function findEntity(board: Board, id: string): unknown {
   const question = board.questions.find((q) => q.id === id);
   if (question) return { kind: 'question', ...question };
   return { id };
+}
+
+function changeResult(result: ChangeResult): CallToolResult {
+  if (!result.ok) return fail(result.error);
+  return ok({
+    boardId: result.board.id,
+    version: result.board.version,
+    changed: result.affectedIds.map((id) => findEntity(result.board, id)),
+    ...result.history,
+  });
 }
 
 function ok(data: unknown): CallToolResult {

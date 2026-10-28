@@ -22,8 +22,8 @@ export function createBoardSocketServer(store: BoardStore): BoardSocketServer {
     }
   };
 
-  const onUpdated = ({ board, command, actor, affectedIds }: BoardUpdatedEvent) =>
-    broadcast({ type: 'updated', board, command, actor, affectedIds }, board.id);
+  const onUpdated = ({ board, change, actor, affectedIds, history }: BoardUpdatedEvent) =>
+    broadcast({ type: 'updated', board, change, actor, affectedIds, history }, board.id);
   const onBoardsChanged = () => broadcast({ type: 'boardsChanged' });
   const onActiveChanged = ({ boardId, actor }: ActiveChangedEvent) =>
     broadcast({ type: 'activeChanged', boardId, actor });
@@ -56,7 +56,13 @@ export function createBoardSocketServer(store: BoardStore): BoardSocketServer {
           return send(ws, { type: 'error', message: `Board ${message.boardId} not found.` });
         subscriptions.set(ws, board.id);
         store.setActive(board.id, 'human');
-        return send(ws, { type: 'snapshot', board });
+        return send(ws, { type: 'snapshot', board, history: store.history(board.id) });
+      }
+
+      if (message.type === 'undo' || message.type === 'redo') {
+        const result = store[message.type](message.boardId, 'human');
+        if (!result.ok) send(ws, { type: 'error', message: result.error });
+        return;
       }
 
       const result = store.apply(message.boardId, message.command, 'human');

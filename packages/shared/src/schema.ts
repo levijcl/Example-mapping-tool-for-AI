@@ -72,6 +72,11 @@ export const CommandSchema = z.discriminatedUnion('type', [
 export type Command = z.infer<typeof CommandSchema>;
 export type CommandType = Command['type'];
 
+/** Anything that changes a board: a command, or moving through its history. */
+export type BoardChange = Command | { type: 'undo' } | { type: 'redo' };
+
+export type HistoryState = { canUndo: boolean; canRedo: boolean };
+
 export type Actor = 'human' | 'ai';
 
 export type BoardSummary = {

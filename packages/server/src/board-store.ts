@@ -4,21 +4,33 @@ import path from 'node:path';
 import {
   applyCommand,
   BoardSchema,
+  changedIds,
   createBoard,
   summarizeBoard,
   type Actor,
-  type ApplyResult,
   type Board,
+  type BoardChange,
   type BoardSummary,
-  type Command,
+  type HistoryState,
 } from '@example-map/shared';
+
+/** Maximum undo steps kept per board; older steps are dropped. */
+export const HISTORY_LIMIT = 100;
 
 export type BoardUpdatedEvent = {
   board: Board;
-  command: Command;
+  change: BoardChange;
   actor: Actor;
   affectedIds: string[];
+  history: HistoryState;
 };
+
+export type ChangeResult =
+  | { ok: true; board: Board; change: BoardChange; affectedIds: string[]; history: HistoryState }
+  | { ok: false; error: string };
+
+/** Snapshots of whole boards; boards are small, so this is simpler than inverse commands. */
+type History = { past: Board[]; future: Board[] };
 
 export type ActiveChangedEvent = {
   boardId: string | null;
@@ -34,10 +46,12 @@ type StoreEvents = {
 /**
  * In-memory source of truth for all boards, persisted as one JSON file per board.
  * Commands are applied synchronously (last write wins); writes to disk are queued per board.
+ * Each board has an in-memory undo/redo history shared by humans and the AI.
  */
 export class BoardStore extends EventEmitter<StoreEvents> {
   private readonly boards = new Map<string, Board>();
   private readonly writes = new Map<string, Promise<void>>();
+  private readonly histories = new Map<string, History>();
   private activeId: string | null = null;
 
   private constructor(private readonly dataDir: string) {
@@ -94,6 +108,7 @@ export class BoardStore extends EventEmitter<StoreEvents> {
 
   delete(boardId: string): boolean {
     if (!this.boards.delete(boardId)) return false;
+    this.histories.delete(boardId);
     this.enqueue(boardId, () => rm(this.filePath(boardId), { force: true }));
     if (this.activeId === boardId) {
       this.activeId = this.list()[0]?.id ?? null;
@@ -103,23 +118,75 @@ export class BoardStore extends EventEmitter<StoreEvents> {
     return true;
   }
 
-  apply(boardId: string, command: unknown, actor: Actor): ApplyResult {
+  apply(boardId: string, command: unknown, actor: Actor): ChangeResult {
     const board = this.boards.get(boardId);
     if (!board) return { ok: false, error: `Board ${boardId} not found.` };
 
     const result = applyCommand(board, command);
     if (!result.ok) return result;
 
-    this.boards.set(boardId, result.board);
-    this.persist(result.board);
-    this.emit('updated', {
-      board: result.board,
-      command: result.command,
-      actor,
-      affectedIds: result.affectedIds,
-    });
+    const history = this.historyOf(boardId);
+    history.past.push(board);
+    if (history.past.length > HISTORY_LIMIT) history.past.shift();
+    history.future = [];
+
+    return this.commit(result.board, result.command, actor, result.affectedIds);
+  }
+
+  undo(boardId: string, actor: Actor): ChangeResult {
+    return this.travel(boardId, 'undo', actor);
+  }
+
+  redo(boardId: string, actor: Actor): ChangeResult {
+    return this.travel(boardId, 'redo', actor);
+  }
+
+  history(boardId: string): HistoryState {
+    const history = this.histories.get(boardId);
+    return { canUndo: !!history?.past.length, canRedo: !!history?.future.length };
+  }
+
+  private travel(boardId: string, direction: 'undo' | 'redo', actor: Actor): ChangeResult {
+    const board = this.boards.get(boardId);
+    if (!board) return { ok: false, error: `Board ${boardId} not found.` };
+
+    const history = this.historyOf(boardId);
+    const [from, to] =
+      direction === 'undo' ? [history.past, history.future] : [history.future, history.past];
+    const target = from.pop();
+    if (!target) return { ok: false, error: `Nothing to ${direction}.` };
+    to.push(board);
+
+    // Restored content gets a new version so versions only ever increase.
+    const next: Board = {
+      ...target,
+      version: board.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    return this.commit(next, { type: direction }, actor, changedIds(board, next));
+  }
+
+  private commit(
+    board: Board,
+    change: BoardChange,
+    actor: Actor,
+    affectedIds: string[],
+  ): ChangeResult {
+    this.boards.set(board.id, board);
+    this.persist(board);
+    const history = this.history(board.id);
+    this.emit('updated', { board, change, actor, affectedIds, history });
     this.emit('boardsChanged');
-    return result;
+    return { ok: true, board, change, affectedIds, history };
+  }
+
+  private historyOf(boardId: string): History {
+    let history = this.histories.get(boardId);
+    if (!history) {
+      history = { past: [], future: [] };
+      this.histories.set(boardId, history);
+    }
+    return history;
   }
 
   /** Resolves once all queued disk writes have finished. */

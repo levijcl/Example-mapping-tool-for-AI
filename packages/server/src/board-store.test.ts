@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BoardStore } from './board-store';
+import { BoardStore, HISTORY_LIMIT } from './board-store';
 
 let dir: string;
 let stores: BoardStore[] = [];
@@ -115,5 +115,106 @@ describe('BoardStore', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = await openStore();
     expect(store.list()).toEqual([]);
+  });
+
+  describe('undo / redo', () => {
+    const texts = (store: BoardStore, id: string) => store.get(id)!.questions.map((q) => q.text);
+
+    it('undoes and redoes commands from any actor, always bumping the version', async () => {
+      const store = await openStore();
+      const board = store.create('B', '', 'human');
+      expect(store.history(board.id)).toEqual({ canUndo: false, canRedo: false });
+
+      store.apply(board.id, { type: 'addQuestion', text: 'human q' }, 'human');
+      store.apply(board.id, { type: 'addQuestion', text: 'ai q' }, 'ai');
+      expect(store.history(board.id)).toEqual({ canUndo: true, canRedo: false });
+
+      const undone = store.undo(board.id, 'human');
+      expect(undone).toMatchObject({
+        ok: true,
+        change: { type: 'undo' },
+        history: { canUndo: true, canRedo: true },
+      });
+      expect(texts(store, board.id)).toEqual(['human q']);
+      expect(store.get(board.id)?.version).toBe(3);
+
+      store.undo(board.id, 'ai');
+      expect(texts(store, board.id)).toEqual([]);
+      expect(store.undo(board.id, 'human')).toEqual({ ok: false, error: 'Nothing to undo.' });
+
+      const redone = store.redo(board.id, 'ai');
+      expect(redone.ok && redone.affectedIds).toEqual([store.get(board.id)!.questions[0]!.id]);
+      store.redo(board.id, 'ai');
+      expect(texts(store, board.id)).toEqual(['human q', 'ai q']);
+      expect(store.get(board.id)?.version).toBe(6);
+      expect(store.redo(board.id, 'human')).toEqual({ ok: false, error: 'Nothing to redo.' });
+    });
+
+    it('treats one command as one step, even a rule added with examples', async () => {
+      const store = await openStore();
+      const board = store.create('B', '', 'human');
+      store.apply(board.id, { type: 'addRule', text: 'R', examples: ['a', 'b'] }, 'ai');
+      store.undo(board.id, 'human');
+      expect(store.get(board.id)?.rules).toEqual([]);
+    });
+
+    it('clears redo after a new change', async () => {
+      const store = await openStore();
+      const board = store.create('B', '', 'human');
+      store.apply(board.id, { type: 'addQuestion', text: 'a' }, 'human');
+      store.undo(board.id, 'human');
+      store.apply(board.id, { type: 'addQuestion', text: 'b' }, 'human');
+      expect(store.history(board.id).canRedo).toBe(false);
+      expect(texts(store, board.id)).toEqual(['b']);
+    });
+
+    it('does not record failed commands', async () => {
+      const store = await openStore();
+      const board = store.create('B', '', 'human');
+      store.apply(board.id, { type: 'deleteRule', ruleId: 'r_x' }, 'ai');
+      expect(store.history(board.id).canUndo).toBe(false);
+    });
+
+    it(`keeps at most ${HISTORY_LIMIT} steps`, async () => {
+      const store = await openStore();
+      const board = store.create('B', '', 'human');
+      for (let i = 0; i < HISTORY_LIMIT + 5; i++) {
+        store.apply(board.id, { type: 'addQuestion', text: `q${i}` }, 'human');
+      }
+      let undos = 0;
+      while (store.undo(board.id, 'human').ok) undos++;
+      expect(undos).toBe(HISTORY_LIMIT);
+      expect(store.get(board.id)?.questions).toHaveLength(5);
+    });
+
+    it('emits updated events for undo and persists the result', async () => {
+      const store = await openStore();
+      const board = store.create('B', '', 'human');
+      store.apply(board.id, { type: 'setStory', text: 'story' }, 'human');
+      const updated = vi.fn();
+      store.on('updated', updated);
+
+      store.undo(board.id, 'ai');
+      expect(updated).toHaveBeenCalledWith(
+        expect.objectContaining({ change: { type: 'undo' }, actor: 'ai', affectedIds: [board.id] }),
+      );
+      await store.flush();
+
+      const reopened = await openStore();
+      expect(reopened.get(board.id)?.story).toBe('');
+      expect(reopened.history(board.id)).toEqual({ canUndo: false, canRedo: false });
+    });
+
+    it('drops history when a board is deleted', async () => {
+      const store = await openStore();
+      const board = store.create('B', '', 'human');
+      store.apply(board.id, { type: 'addQuestion', text: 'q' }, 'human');
+      store.delete(board.id);
+      expect(store.history(board.id)).toEqual({ canUndo: false, canRedo: false });
+      expect(store.undo(board.id, 'human')).toEqual({
+        ok: false,
+        error: `Board ${board.id} not found.`,
+      });
+    });
   });
 });

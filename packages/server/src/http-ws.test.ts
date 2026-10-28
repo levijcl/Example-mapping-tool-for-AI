@@ -78,6 +78,36 @@ describe('WebSocket /ws', () => {
     await a.next('updated');
   });
 
+  it('undoes and redoes human commands and reports history state', async () => {
+    const board = server.store.create('Coupons', '', 'human');
+    const ws = await connect();
+    ws.send({ type: 'open', boardId: board.id });
+    await ws.next('snapshot');
+
+    ws.send({
+      type: 'command',
+      boardId: board.id,
+      requestId: '1',
+      command: { type: 'addQuestion', text: 'q' },
+    });
+    expect((await ws.next('updated')).history).toEqual({ canUndo: true, canRedo: false });
+
+    ws.send({ type: 'undo', boardId: board.id });
+    const undone = await ws.next('updated');
+    expect(undone).toMatchObject({
+      actor: 'human',
+      change: { type: 'undo' },
+      history: { canUndo: false, canRedo: true },
+    });
+    expect(undone.board.questions).toEqual([]);
+
+    ws.send({ type: 'redo', boardId: board.id });
+    expect((await ws.next('updated')).board.questions).toHaveLength(1);
+
+    ws.send({ type: 'redo', boardId: board.id });
+    expect((await ws.next('error')).message).toBe('Nothing to redo.');
+  });
+
   it('broadcasts store changes made by the AI', async () => {
     const board = server.store.create('Coupons', '', 'human');
     const ws = await connect();
