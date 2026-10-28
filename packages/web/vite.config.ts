@@ -2,9 +2,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { DEFAULT_PORT } from '@example-map/shared';
 
-const target = `http://127.0.0.1:${process.env.PORT ?? DEFAULT_PORT}`;
+const target = `http://127.0.0.1:${process.env.PORT ?? 4319}`;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
