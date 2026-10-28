@@ -251,7 +251,6 @@ Board 很小（數十張卡），每次變更都送整張 board，前端直接�
 
 ## 12. MVP 之後（不在本次範圍）
 
-- Undo／redo（特別是撤銷 AI 的一批操作）
 - 匯出 Gherkin `.feature`
 - Question 關聯到特定 Rule
 - 鍵盤快捷鍵
@@ -261,4 +260,57 @@ Board 很小（數十張卡），每次變更都送整張 board，前端直接�
 
 1. Port 預設 4319。
 2. 資料目錄為 repo 內的 `boards/`，加入 `.gitignore`。
-3. Undo 不在 MVP，列入第 12 節之後再做。
+3. Undo 不在 MVP，於 MVP 之後以第 14 節實作。
+
+## 14. Undo / Redo
+
+> 狀態：Approved · 2026-10-28
+
+### 決定
+
+| 項目       | 決定                                                                               |
+| ---------- | ---------------------------------------------------------------------------------- |
+| 範圍       | 每個 board 一條**共用**歷史，不分 human／AI；Undo 撤銷最新的一步，不論是誰做的     |
+| 一步的粒度 | **一個 command 一步**。AI 的一次工具呼叫是一步（`add_rule` 帶 examples 也是一步）  |
+| 保存       | **只存在記憶體**，server 重啟後歷史清空（board 內容本身照常持久化）                |
+| 深度       | 每個 board 最多 100 步，超過丟棄最舊的                                             |
+| Redo       | 做了新的修改（任何 command）之後，redo 清空                                        |
+| 不列入歷史 | 建立／刪除 board                                                                   |
+| AI         | 提供 MCP 工具 `undo`、`redo`                                                       |
+| UI         | Header 上的 Undo／Redo 按鈕（無可用步驟時 disabled），Cmd/Ctrl+Z、Cmd/Ctrl+Shift+Z |
+
+### 行為
+
+- 歷史放在 server 的 `BoardStore`，以**整張 board 快照**記錄：每次成功套用 command 前，把當時的 board 推入 `past`。
+- Undo：`past` 取出最後一個快照成為目前內容，原內容推入 `future`；Redo 反之。
+- Undo／Redo 產生的新狀態 `version` 仍然遞增（不倒回舊 version），並且和一般修改一樣**立即寫入磁碟**、廣播 `updated`。
+- `updated` 的 `affectedIds` 為前後兩版之間內容有變化或新出現的卡片（被移除的卡片不列入）；actor 為 ai 時 UI 照常高亮。
+- 正在編輯文字框（textarea／input）時，快捷鍵交給瀏覽器原生的文字 undo，不觸發畫板 undo。
+- 沒有可撤銷／重做的步驟時回傳錯誤：`Nothing to undo.`／`Nothing to redo.`
+
+### 介面變更
+
+- 新增型別 `BoardChange = Command | { type: 'undo' } | { type: 'redo' }`；`updated` 訊息與 store 事件的 `command` 欄位改名為 `change: BoardChange`。
+- `snapshot` 與 `updated` 訊息新增 `history: { canUndo: boolean; canRedo: boolean }`。
+- WebSocket Client → Server 新增 `{ type: 'undo'; boardId }`、`{ type: 'redo'; boardId }`。
+- MCP 新增工具：
+  - `undo`（`boardId?`）：撤銷最新一步。描述中提醒 AI：歷史是共用的，可能撤銷到人類的修改；先 `get_board` 確認，並告訴使用者撤銷了什麼。
+  - `redo`（`boardId?`）
+  - 回傳 `{ boardId, version, changed, canUndo, canRedo }`。
+
+### 驗收條件
+
+- [ ] UI 按 Undo／Cmd+Z 撤銷最新一步（不論 human 或 AI），Redo 可重做；按鈕依狀態 enabled／disabled
+- [ ] 編輯文字時 Cmd+Z 不會觸發畫板 undo
+- [ ] AI 透過 `undo`／`redo` 工具操作，UI 即時更新並高亮
+- [ ] 新修改後 redo 清空；超過 100 步丟棄最舊
+- [ ] Undo 後的內容立即寫入磁碟，重啟後仍是 undo 後的內容（歷史本身清空）
+
+## 15. 已知事項：資料「消失」的排查
+
+2026-10-28 曾發生「重啟 service 後內容全部不見」。原因是當時使用的 server 是開發過程中以暫存目錄為 `DATA_DIR` 啟動的測試 server，資料寫進了暫存目錄而非 `boards/`；**程式的即時儲存行為本身正常**（每次修改都立即寫入 `<DATA_DIR>/<boardId>.json`）。資料已從暫存目錄復原到 `boards/`。
+
+決定：**不另外新增「即時儲存」功能**。排查方式：
+
+1. 看 server 啟動時印出的 `Data dir:`，確認是否為 `<repo>/boards`。
+2. 確認 port 4319 上跑的是哪個 process（`lsof -nP -iTCP:4319 -sTCP:LISTEN`），避免連到別的 server。

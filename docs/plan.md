@@ -94,3 +94,27 @@ T1 → T2 → T3 → T4 → T5 → T6
 ```
 
 T6（MCP）和 T7（UI 骨架）只依賴 T5，可以平行進行。
+
+## Phase 5 — Undo / Redo（spec §14）
+
+### T12. History in BoardStore
+
+- shared：`BoardChange` 型別、`changedIds(before, after)`（找出內容有變或新出現的卡片 ID）
+- `BoardStore`：每個 board 的 `past`／`future` 快照堆疊（上限 100）、`undo`／`redo`、`history(boardId)`
+- **驗收**：undo／redo 正確還原內容、version 遞增、新修改清空 redo、上限 100、刪除 board 時清掉歷史、undo 結果有寫入磁碟
+
+### T13. WS + MCP
+
+- WS：`undo`／`redo` 訊息；`snapshot`／`updated` 帶 `history`；`command` 欄位改名為 `change`
+- MCP：`undo`、`redo` 工具
+- **驗收**：整合測試涵蓋 human 與 AI 觸發的 undo／redo 廣播與錯誤訊息
+
+### T14. UI
+
+- Header 的 Undo／Redo 按鈕、Cmd/Ctrl+Z／Cmd/Ctrl+Shift+Z（文字框內不攔截）
+- **驗收**：`isBoardShortcut` 判斷邏輯有單元測試
+
+### T15. E2E
+
+- 人類修改 → Cmd+Z 撤銷 → Redo；AI 呼叫 `undo` → UI 更新
+- **驗收**：spec §14 驗收條件全部打勾
