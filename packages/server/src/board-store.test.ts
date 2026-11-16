@@ -112,9 +112,11 @@ describe('BoardStore', () => {
 
   it('skips invalid board files on load', async () => {
     await writeFile(path.join(dir, 'broken.json'), '{ not json');
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const store = await openStore();
     expect(store.list()).toEqual([]);
+    // Loud enough to notice, and names the file so it can be fixed by hand.
+    expect(error).toHaveBeenCalledWith(expect.stringContaining(path.join(dir, 'broken.json')));
   });
 
   describe('undo / redo', () => {

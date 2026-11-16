@@ -1,11 +1,13 @@
 import { EventEmitter } from 'node:events';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { ZodError } from 'zod';
 import {
   applyCommand,
   BoardSchema,
   changedIds,
   createBoard,
+  formatZodError,
   summarizeBoard,
   type Actor,
   type Board,
@@ -63,12 +65,16 @@ export class BoardStore extends EventEmitter<StoreEvents> {
     await mkdir(dataDir, { recursive: true });
     for (const file of await readdir(dataDir)) {
       if (!file.endsWith('.json')) continue;
+      const filePath = path.join(dataDir, file);
       try {
-        const raw = JSON.parse(await readFile(path.join(dataDir, file), 'utf8'));
-        const board = BoardSchema.parse(raw);
+        const board = BoardSchema.parse(JSON.parse(await readFile(filePath, 'utf8')));
         store.boards.set(board.id, board);
       } catch (error) {
-        console.warn(`Skipping invalid board file ${file}:`, error);
+        const reason = error instanceof ZodError ? formatZodError(error) : String(error);
+        console.error(
+          `WARNING: board file ${filePath} could not be loaded and is hidden from the UI and AI ` +
+            `(${reason}). The file was left untouched; fix it by hand and restart.`,
+        );
       }
     }
     store.activeId = store.list()[0]?.id ?? null;

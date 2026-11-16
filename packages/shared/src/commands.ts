@@ -1,5 +1,6 @@
 import { newId as defaultNewId, type IdPrefix } from './ids';
 import {
+  BoardSchema,
   CommandSchema,
   formatZodError,
   type Board,
@@ -27,18 +28,19 @@ class CommandError extends Error {}
 
 const REFRESH_HINT = 'Call get_board to refresh.';
 
+/** Throws if the board would not pass `BoardSchema` (e.g. a blank title), since it couldn't be loaded back. */
 export function createBoard(title: string, story = '', options: ApplyOptions = {}): Board {
   const now = (options.now ?? defaultNow)();
-  return {
+  return BoardSchema.parse({
     id: (options.newId ?? defaultNewId)('b'),
-    title: title.trim(),
-    story: story.trim(),
+    title,
+    story,
     rules: [],
     questions: [],
     version: 0,
     createdAt: now,
     updatedAt: now,
-  };
+  });
 }
 
 export function applyCommand(

@@ -135,6 +135,14 @@ describe('MCP server', () => {
     );
   });
 
+  it('rejects whitespace-only text so every saved board loads back after a restart', async () => {
+    expect((await call('create_board', { title: '   ' })).isError).toBe(true);
+    expect((await call('list_boards')).json().boards).toEqual([]);
+
+    await call('create_board', { title: 'Coupons' });
+    expect((await call('add_rule', { text: 'Min $1000', examples: ['  '] })).isError).toBe(true);
+  });
+
   it('targets an explicit board and makes it active', async () => {
     const first = (await call('create_board', { title: 'First' })).json().board as Board;
     await call('create_board', { title: 'Second' });

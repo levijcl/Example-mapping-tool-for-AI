@@ -314,3 +314,4 @@ Board 很小（數十張卡），每次變更都送整張 board，前端直接�
 
 1. 看 server 啟動時印出的 `Data dir:`，確認是否為 `<repo>/boards`。
 2. 確認 port 4319 上跑的是哪個 process（`lsof -nP -iTCP:4319 -sTCP:LISTEN`），避免連到別的 server。
+3. 看 server 啟動 log 有沒有 `WARNING: board file … could not be loaded`：格式不合法的 board 檔會被略過（檔案保留不動），修好後重啟即可。所有寫入路徑（MCP、HTTP、WS）都用同一組 shared text schema，確保存進去的 board 一定能載回來。

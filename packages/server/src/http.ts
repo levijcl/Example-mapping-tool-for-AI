@@ -4,14 +4,14 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { formatZodError } from '@example-map/shared';
+import { formatZodError, TextSchema } from '@example-map/shared';
 import type { BoardStore } from './board-store';
 import { isLocalHost, isLocalOrigin } from './local-only';
 import { createMcpServer } from './mcp';
 
 const WEB_DIST = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
-const CreateBoardSchema = z.object({ title: z.string().trim().min(1).max(500) });
+const CreateBoardSchema = z.object({ title: TextSchema });
 
 export function createHttpApp(store: BoardStore, webDist = WEB_DIST): Hono {
   const app = new Hono();

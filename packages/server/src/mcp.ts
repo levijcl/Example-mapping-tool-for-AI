@@ -4,7 +4,8 @@ import { z } from 'zod';
 import {
   analyzeBoard,
   exportMarkdown,
-  TEXT_MAX_LENGTH,
+  OptionalTextSchema,
+  TextSchema,
   type Board,
   type Command,
 } from '@example-map/shared';
@@ -37,7 +38,7 @@ const boardIdArg = z
   .string()
   .optional()
   .describe('Board ID. Omit to use the active board (the one currently open in the UI).');
-const text = z.string().min(1).max(TEXT_MAX_LENGTH);
+const text = TextSchema;
 const index = z.number().int().min(0);
 
 type BoardResolution = { ok: true; board: Board } | { ok: false; error: string };
@@ -122,7 +123,7 @@ export function createMcpServer(store: BoardStore): McpServer {
         'Create a new board for a user story. It becomes the active board and opens in the UI.',
       inputSchema: {
         title: text.describe('Short board title, e.g. the feature name.'),
-        story: z.string().max(TEXT_MAX_LENGTH).optional().describe('The user story text.'),
+        story: OptionalTextSchema.optional().describe('The user story text.'),
       },
     },
     async ({ title, story }) => ok(describeBoard(store.create(title, story ?? '', 'ai'))),
@@ -175,7 +176,7 @@ export function createMcpServer(store: BoardStore): McpServer {
   commandTool(
     'set_story',
     'Set or rewrite the user story (yellow card).',
-    { text: z.string().max(TEXT_MAX_LENGTH) },
+    { text: OptionalTextSchema },
     ({ text }) => ({ type: 'setStory', text }),
   );
 
@@ -257,7 +258,7 @@ export function createMcpServer(store: BoardStore): McpServer {
   commandTool(
     'resolve_question',
     'Mark a question as answered, recording the answer. Usually follow up by adding or updating rules/examples.',
-    { questionId: z.string(), resolution: z.string().max(TEXT_MAX_LENGTH).optional() },
+    { questionId: z.string(), resolution: OptionalTextSchema.optional() },
     ({ questionId, resolution }) => ({ type: 'resolveQuestion', questionId, resolution }),
   );
   commandTool(

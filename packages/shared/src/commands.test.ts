@@ -55,6 +55,10 @@ describe('createBoard', () => {
       updatedAt: '2026-10-28T00:00:00.000Z',
     });
   });
+
+  it('refuses to create a board that would not load back', () => {
+    expect(() => createBoard('   ', '', options)).toThrow();
+  });
 });
 
 describe('applyCommand', () => {

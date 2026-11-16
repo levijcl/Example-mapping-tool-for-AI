@@ -2,8 +2,11 @@ import { z } from 'zod';
 
 export const TEXT_MAX_LENGTH = 500;
 
-const text = z.string().trim().min(1).max(TEXT_MAX_LENGTH);
-const optionalText = z.string().trim().max(TEXT_MAX_LENGTH);
+/** Card text. Every input path must use these so nothing is saved that `BoardSchema` won't load. */
+export const TextSchema = z.string().trim().min(1).max(TEXT_MAX_LENGTH);
+export const OptionalTextSchema = z.string().trim().max(TEXT_MAX_LENGTH);
+const text = TextSchema;
+const optionalText = OptionalTextSchema;
 const index = z.number().int().min(0);
 
 export const ExampleSchema = z.object({ id: z.string(), text });
