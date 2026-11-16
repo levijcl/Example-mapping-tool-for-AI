@@ -1,120 +1,80 @@
-import { expect, test, type Page } from '@playwright/test';
-import type { Board } from '@example-map/shared';
-import { Agent } from './mcp';
+import { test } from './fixtures';
+import { TheBoard, TheQuestions, TheRules } from './domain/questions';
+import {
+  AddExample,
+  AddQuestion,
+  AddRule,
+  CreateBoard,
+  MoveExample,
+  OpenTheApp,
+  ReloadTheApp,
+  ResolveQuestion,
+  RewordRule,
+  TakeAScreenshot,
+} from './domain/tasks';
 
-let agent: Agent;
+const story = 'Pay with a coupon';
 
-test.beforeEach(async ({ baseURL }) => {
-  agent = await Agent.connect(baseURL!);
+test.beforeEach(async ({ human }) => {
+  await human.attemptsTo(OpenTheApp());
 });
 
-test.afterEach(async () => {
-  await agent.close();
-});
+test('AI changes appear live in the browser and are highlighted', async ({ human, ai }) => {
+  await ai.attemptsTo(CreateBoard('AI live updates', { story }));
+  await human.sees(TheBoard.title()).toBe('AI live updates');
 
-async function createBoardViaAgent(page: Page, title: string): Promise<Board> {
-  await page.goto('/');
-  await expect(page.getByText(/Connecting to server|Disconnected from server/)).toBeHidden();
-  const { board } = await agent.call<{ board: Board }>('create_board', {
-    title,
-    story: 'Pay with a coupon',
-  });
-  await expect(page.getByRole('button', { name: 'Edit board title' })).toHaveText(title);
-  return board;
-}
-
-test('AI changes appear live in the browser and are highlighted', async ({ page }) => {
-  await createBoardViaAgent(page, 'AI live updates');
-
-  const { changed } = await agent.call<{ changed: Array<{ id: string }> }>('add_rule', {
-    text: 'Orders must total at least $1000',
-    examples: ['$900 cart → coupon rejected'],
-  });
-  await agent.call('add_question', { text: 'Does tax count toward the minimum?' });
-
-  const rule = page.getByTestId(changed[0]!.id);
-  await expect(rule).toContainText('Orders must total at least $1000');
-  await expect(rule).toHaveAttribute('data-highlighted', 'true');
-  await expect(page.getByTestId(changed[1]!.id)).toContainText('$900 cart → coupon rejected');
-  await expect(page.getByRole('region', { name: 'Questions' })).toContainText('Does tax count');
-
-  await page.screenshot({ path: 'test-results/ai-live-updates.png' });
-  await expect(rule).not.toHaveAttribute('data-highlighted');
-});
-
-test('manual edits in the browser are visible to the AI', async ({ page }) => {
-  await createBoardViaAgent(page, 'Manual edits');
-  const { changed } = await agent.call<{ changed: Array<{ id: string }> }>('add_rule', {
-    text: 'Old rule',
-  });
-  const rule = page.getByTestId(changed[0]!.id);
-
-  await rule.getByRole('button', { name: 'Edit rule' }).click();
-  await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.type('One coupon per order');
-  await page.keyboard.press('Enter');
-  await expect(rule).toContainText('One coupon per order');
-
-  await page
-    .getByRole('region', { name: /^Rule: One coupon/ })
-    .getByRole('button', { name: '+ Example' })
-    .click();
-  await page.keyboard.type('Two coupons → second one rejected');
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('Escape');
-
-  await page.getByRole('button', { name: '+ Question' }).click();
-  await page.keyboard.type('What about gift cards?');
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('Escape');
-
-  await expect(page.getByRole('region', { name: 'Questions' })).toContainText(
-    'What about gift cards?',
+  await ai.attemptsTo(
+    AddRule('Orders must total at least $1000', { examples: ['$900 cart → coupon rejected'] }),
+    AddQuestion('Does tax count toward the minimum?'),
   );
-  await expect(rule).not.toHaveAttribute('data-highlighted');
 
-  const board = await agent.getBoard();
-  expect(board.rules[0]?.text).toBe('One coupon per order');
-  expect(board.rules[0]?.examples.map((e) => e.text)).toEqual([
-    'Two coupons → second one rejected',
-  ]);
-  expect(board.questions.map((q) => q.text)).toEqual(['What about gift cards?']);
+  await human.sees(TheRules.all()).toEqual(['Orders must total at least $1000']);
+  await human.sees(TheRules.isHighlighted('Orders must total at least $1000')).toBe(true);
+  await human
+    .sees(TheRules.examplesOf('Orders must total at least $1000'))
+    .toEqual(['$900 cart → coupon rejected']);
+  await human.sees(TheQuestions.open()).toEqual(['Does tax count toward the minimum?']);
+  await human.attemptsTo(TakeAScreenshot('ai-live-updates'));
 
-  const questionId = board.questions[0]!.id;
-  await page.getByTestId(questionId).hover();
-  await page.getByTestId(questionId).getByRole('button', { name: 'Resolve question' }).click();
-  await expect.poll(async () => (await agent.getBoard()).questions[0]?.status).toBe('resolved');
+  await human.sees(TheRules.isHighlighted('Orders must total at least $1000')).toBe(false);
 });
 
-test('dragging an example to another rule persists across reload', async ({ page }) => {
-  await createBoardViaAgent(page, 'Drag and drop');
-  await agent.call('add_rule', { text: 'Rule A', examples: ['Example 1', 'Example 2'] });
-  await agent.call('add_rule', { text: 'Rule B' });
-  const before = await agent.getBoard();
-  const [ruleA, ruleB] = before.rules;
-  const example1 = ruleA!.examples[0]!;
+test('manual edits in the browser are visible to the AI', async ({ human, ai }) => {
+  await ai.attemptsTo(CreateBoard('Manual edits', { story }));
+  await human.sees(TheBoard.title()).toBe('Manual edits');
+  await ai.attemptsTo(AddRule('Old rule'));
 
-  const source = page.getByTestId(example1.id);
-  const target = page.getByRole('region', { name: 'Rule: Rule B' });
-  await expect(source).toBeVisible();
-  const from = (await source.boundingBox())!;
-  const to = (await target.boundingBox())!;
+  await human.attemptsTo(
+    RewordRule('Old rule').to('One coupon per order'),
+    AddExample('Two coupons → second one rejected').toTheRule('One coupon per order'),
+    AddQuestion('What about gift cards?'),
+  );
+  await human.sees(TheQuestions.open()).toEqual(['What about gift cards?']);
+  await human.sees(TheRules.isHighlighted('One coupon per order')).toBe(false);
 
-  await page.mouse.move(from.x + 20, from.y + from.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(from.x + 40, from.y + from.height / 2, { steps: 5 });
-  await page.mouse.move(to.x + to.width / 2, to.y + to.height - 10, { steps: 15 });
-  await page.mouse.up();
+  await ai.sees(TheRules.all()).toEqual(['One coupon per order']);
+  await ai
+    .sees(TheRules.examplesOf('One coupon per order'))
+    .toEqual(['Two coupons → second one rejected']);
+  await ai.sees(TheQuestions.open()).toEqual(['What about gift cards?']);
 
-  await expect
-    .poll(async () => (await agent.getBoard()).rules[1]?.examples.map((e) => e.id))
-    .toEqual([example1.id]);
+  await human.attemptsTo(ResolveQuestion('What about gift cards?'));
+  await ai.sees(TheQuestions.resolved()).toEqual(['What about gift cards?']);
+});
 
-  await page.reload();
-  await expect(target.getByTestId(example1.id)).toBeVisible();
-  await expect(
-    page.getByRole('region', { name: 'Rule: Rule A' }).getByTestId(example1.id),
-  ).toHaveCount(0);
-  expect(ruleB).toBeDefined();
-  await page.screenshot({ path: 'test-results/after-drag.png' });
+test('dragging an example to another rule persists across reload', async ({ human, ai }) => {
+  await ai.attemptsTo(CreateBoard('Drag and drop', { story }));
+  await human.sees(TheBoard.title()).toBe('Drag and drop');
+  await ai.attemptsTo(
+    AddRule('Rule A', { examples: ['Example 1', 'Example 2'] }),
+    AddRule('Rule B'),
+  );
+
+  await human.attemptsTo(MoveExample('Example 1').toTheRule('Rule B'));
+  await ai.sees(TheRules.examplesOf('Rule B')).toEqual(['Example 1']);
+
+  await human.attemptsTo(ReloadTheApp());
+  await human.sees(TheRules.examplesOf('Rule B')).toEqual(['Example 1']);
+  await human.sees(TheRules.examplesOf('Rule A')).toEqual(['Example 2']);
+  await human.attemptsTo(TakeAScreenshot('after-drag'));
 });

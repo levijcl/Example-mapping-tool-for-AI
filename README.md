@@ -88,9 +88,33 @@ packages/
   shared/   資料模型（zod）、applyCommand、健康度分析、Markdown 匯出、WS 協定
   server/   BoardStore（JSON 持久化）、REST + WebSocket、MCP server
   web/      React + Tailwind + dnd-kit 畫板
-e2e/        Playwright：AI ↔ 瀏覽器同步、手動編輯、拖拉
+e2e/        Playwright：AI ↔ 瀏覽器同步、手動編輯、拖拉、undo/redo（Screenplay 三層，見下）
 docs/       spec 與實作計畫
 ```
+
+### E2E 測試架構
+
+E2E 測試採用 _BDD in Action_（第二版）「可攜式測試自動化」的三層架構，以輕量版 Screenplay Pattern 實作：
+
+```
+e2e/
+  *.spec.ts       規格層：只用業務語言描述誰做了什麼、看到什麼
+  domain/         領域層：Task（tasks.ts）與 Question（questions.ts）
+  integration/    整合層：Ability，唯一知道 DOM（browse-the-web.ts）與 MCP（call-mcp-tools.ts）的地方
+  screenplay.ts   核心：Actor、Ability、task()、question()
+  fixtures.ts     角色：human（瀏覽器）與 ai（MCP），共用同一塊 board
+```
+
+```ts
+await ai.attemptsTo(AddRule('Rule A', { examples: ['Example 1'] }), AddRule('Rule B'));
+await human.attemptsTo(MoveExample('Example 1').toTheRule('Rule B'));
+await ai.sees(TheRules.examplesOf('Rule B')).toEqual(['Example 1']);
+```
+
+- 每個 Task／Question 用 `via(Ability, …)` 列出各介面的實作，執行時依角色擁有的 Ability 選擇：同一個 `AddQuestion('…')`，human 會點 UI，ai 會呼叫 MCP tool。
+- 卡片一律以文字指稱；需要 id 時（MCP）由整合層從 `get_board` 查出。
+- `actor.sees(question)` 是會重試的斷言（`expect.poll`），所以 Question 只回傳當下快照、不等待。
+- 新增測試時：先找 `domain/` 是否已有對應的 Task／Question；新的 DOM locator 放在 `BoardScreen`（`integration/browse-the-web.ts`），不要寫進 spec。
 
 ### 資料存在哪裡？
 

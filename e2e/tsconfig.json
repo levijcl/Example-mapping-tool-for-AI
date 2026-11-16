@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "paths": {
+      "@example-map/shared": ["../packages/shared/src/index.ts"]
+    }
+  },
+  "include": [".", "../playwright.config.ts"]
+}
