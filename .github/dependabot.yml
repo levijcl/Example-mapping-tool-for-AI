@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # pnpm workspace: the npm ecosystem detects pnpm-lock.yaml. "/" covers the root
+  # package.json and every packages/* workspace through the single lockfile.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Taipei"
+    # Wait a few days after a release before proposing it (supply-chain safety).
+    cooldown:
+      default-days: 3
+    # One PR for all minor/patch bumps avoids a chain of lockfile conflicts.
+    # Majors still get their own PR and are never auto-merged.
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Taipei"
+    cooldown:
+      default-days: 3
+    groups:
+      actions-minor-and-patch:
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore(ci)"
