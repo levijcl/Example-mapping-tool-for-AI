@@ -12,6 +12,8 @@ AI 下一輪會讀到你的修改。
 - AI 剛改過的卡片會發出紫色光暈約 2 秒
 - 資料存在 `boards/*.json`（已加入 `.gitignore`）
 
+![Example Map 畫板](docs/screenshot.png)
+
 詳細設計見 [docs/spec.md](docs/spec.md)。
 
 ## 需求

@@ -8,7 +8,7 @@ Ask your AI agent (Claude Code, Cursor, or any MCP client) to act as an Example 
 Story, Rules, Examples and Questions on a shared board while you watch in the browser. You can edit and drag cards
 yourself too, and the AI sees your changes on its next turn.
 
-<!-- Screenshot: add a board screenshot or GIF here, e.g. ![Example Map board](docs/screenshot.png) -->
+![Example Map board: a story, four rules with examples, and open and resolved questions](docs/screenshot.png)
 
 ## Features
 
