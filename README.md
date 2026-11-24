@@ -1,34 +1,41 @@
+English | [繁體中文](README.zh-TW.md)
+
 # Example Map
 
-一個在本機執行、**AI 可以透過 MCP 操控**的 Example Mapping 畫板。
+A local [Example Mapping](https://cucumber.io/blog/bdd/example-mapping-introduction/) board that AI agents can drive through **MCP**.
 
-你在 AI agent tool（Claude Code、Claude Desktop、Cursor…）裡用對話請 AI 扮演 Example Mapping facilitator，
-它會在畫板上建立 Story、Rules、Examples、Questions；你在瀏覽器裡即時看到變化，也可以直接手動編輯、拖拉，
-AI 下一輪會讀到你的修改。
+Ask your AI agent (Claude Code, Cursor, or any MCP client) to act as an Example Mapping facilitator. It builds the
+Story, Rules, Examples and Questions on a shared board while you watch in the browser. You can edit and drag cards
+yourself too, and the AI sees your changes on its next turn.
 
-- 黃卡 Story · 藍卡 Rules · 綠卡 Examples · 紅卡 Questions
-- AI 剛改過的卡片會發出紫色光暈約 2 秒
-- 資料存在 `boards/*.json`（已加入 `.gitignore`）
+<!-- Screenshot: add a board screenshot or GIF here, e.g. ![Example Map board](docs/screenshot.png) -->
 
-詳細設計見 [docs/spec.md](docs/spec.md)。
+## Features
 
-## 需求
+- **Classic four-color cards**: yellow Story, blue Rules, green Examples, red Questions
+- **Real-time sync**: AI changes show up in the browser instantly over WebSocket, and cards the AI just touched glow purple for about 2 seconds
+- **Human + AI on one board**: inline editing, drag-and-drop to reorder rules or move examples between rules
+- **Shared undo/redo**: one history for you and the AI, one step per action. You can also ask the AI to "undo that last step"
+- **Board health hints**: `get_board` flags things like rules without examples or too many open questions, so the AI can prompt you
+- **Markdown export** of any board
+- **Local-first**: runs on your machine and stores boards as JSON files
 
-- Node.js 22+
-- pnpm 10+
+## Quick start
 
-## 開始使用
+Requires Node.js 22+ and pnpm 10+.
 
 ```bash
+git clone https://github.com/levijcl/Example-mapping-tool-for-AI.git
+cd Example-mapping-tool-for-AI
 pnpm install
 pnpm start
 ```
 
-打開 <http://127.0.0.1:4319>。
+Open <http://127.0.0.1:4319> in your browser.
 
-### 連接 AI agent
+## Connect your AI agent
 
-Server 在 `http://127.0.0.1:4319/mcp` 提供 MCP（Streamable HTTP）。
+The server exposes MCP over **Streamable HTTP** at `http://127.0.0.1:4319/mcp`.
 
 **Claude Code**
 
@@ -36,96 +43,83 @@ Server 在 `http://127.0.0.1:4319/mcp` 提供 MCP（Streamable HTTP）。
 claude mcp add --transport http example-map http://127.0.0.1:4319/mcp
 ```
 
-**其他支援 MCP 的工具**：新增一個 HTTP（Streamable HTTP）類型的 MCP server，URL 填上面的 endpoint。
+**Cursor** (`.cursor/mcp.json`)
 
-### 使用範例
+```json
+{
+  "mcpServers": {
+    "example-map": { "url": "http://127.0.0.1:4319/mcp" }
+  }
+}
+```
 
-在 agent 裡說：
+**Other MCP clients**: add a Streamable HTTP server with the URL above.
 
-> 我們來做 example mapping：「身為購物者，我可以在結帳時使用優惠券」
+## Usage
 
-或使用 MCP prompt `facilitate-example-mapping`（Claude Code 中為 `/mcp__example-map__facilitate-example-mapping`）。
+Tell your agent something like:
 
-AI 會建立 board、提出 rules 與具體 examples，並把不確定的地方記成 questions。你可以：
+> Let's do example mapping for: "As a shopper, I can apply a coupon at checkout"
 
-- 直接在畫板上點擊文字編輯（Enter 儲存、Shift+Enter 換行、Esc 取消）
-- 拖拉 rule 欄位重新排序，拖拉 example 到其他 rule
-- 用 Undo／Redo 按鈕或 Cmd/Ctrl+Z、Cmd/Ctrl+Shift+Z 撤銷／重做（你和 AI 共用一條歷史，一個操作一步；也可以直接請 AI「復原剛剛那一步」）
-- 把 question 標為已解決並填入答案，再請 AI「根據答案更新 rules」
+Or use the built-in MCP prompt `facilitate-example-mapping` (in Claude Code:
+`/mcp__example-map__facilitate-example-mapping`).
 
-AI 的操作預設作用在**畫面上目前開啟的 board**。
+The AI creates a board, proposes rules with concrete examples, and records anything uncertain as questions. You can then:
 
-## MCP 工具
+- Click any text to edit it (Enter saves, Shift+Enter adds a new line, Esc cancels)
+- Drag rule columns to reorder them, or drag an example onto another rule
+- Undo/redo with the toolbar buttons or Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z
+- Resolve a question with an answer, then ask the AI to "update the rules based on the answers"
 
-| 類別      | 工具                                                                                        |
+AI actions apply to **the board currently open in the browser** by default.
+
+## MCP tools
+
+| Category  | Tools                                                                                       |
 | --------- | ------------------------------------------------------------------------------------------- |
-| Board     | `list_boards`、`create_board`、`open_board`、`get_board`、`export_markdown`                 |
-| Story     | `set_title`、`set_story`                                                                    |
-| Rules     | `add_rule`（可同時帶 examples）、`update_rule`、`delete_rule`、`move_rule`                  |
-| Examples  | `add_example`、`update_example`、`delete_example`、`move_example`                           |
-| Questions | `add_question`、`update_question`、`resolve_question`、`reopen_question`、`delete_question` |
-| History   | `undo`、`redo`                                                                              |
+| Board     | `list_boards`, `create_board`, `open_board`, `get_board`, `export_markdown`                 |
+| Story     | `set_title`, `set_story`                                                                    |
+| Rules     | `add_rule` (can include examples), `update_rule`, `delete_rule`, `move_rule`                |
+| Examples  | `add_example`, `update_example`, `delete_example`, `move_example`                           |
+| Questions | `add_question`, `update_question`, `resolve_question`, `reopen_question`, `delete_question` |
+| History   | `undo`, `redo`                                                                              |
 
-`get_board` 會附上 hints（例如某條 rule 沒有 example、open questions 太多），讓 AI 主動提醒你。
-刪除整個 board 只能在 UI 上做。
+**Prompt:** `facilitate-example-mapping`
 
-## 開發
+Deleting a whole board is only possible from the UI.
+
+## Configuration
+
+| Variable   | Default         | Description                      |
+| ---------- | --------------- | -------------------------------- |
+| `PORT`     | `4319`          | HTTP / WebSocket / MCP port      |
+| `DATA_DIR` | `<repo>/boards` | Where board JSON files are saved |
+
+Every change is written to `DATA_DIR` immediately. Undo history is kept in memory only and is cleared on restart.
+
+## Security
+
+The server binds to `127.0.0.1` only and rejects HTTP and WebSocket requests whose Host or Origin is not localhost.
+This stops malicious web pages from reaching your board through your browser (DNS rebinding, cross-site WebSocket).
+
+## Development
 
 ```bash
-pnpm dev          # server (watch, :4319) + Vite dev server（自動 proxy /api /ws /mcp）
-pnpm test         # Vitest：shared / server / web
-pnpm test:e2e     # Playwright（首次需 pnpm exec playwright install chromium）
+pnpm dev          # server (watch, :4319) + Vite dev server (proxies /api /ws /mcp)
+pnpm test         # Vitest: shared / server / web
+pnpm test:e2e     # Playwright (run `pnpm exec playwright install chromium` first)
 pnpm typecheck
 pnpm lint
 ```
 
-環境變數：`PORT`（預設 4319）、`DATA_DIR`（預設 `<repo>/boards`）。
-
-### 專案結構
-
 ```
 packages/
-  shared/   資料模型（zod）、applyCommand、健康度分析、Markdown 匯出、WS 協定
-  server/   BoardStore（JSON 持久化）、REST + WebSocket、MCP server
-  web/      React + Tailwind + dnd-kit 畫板
-e2e/        Playwright：AI ↔ 瀏覽器同步、手動編輯、拖拉、undo/redo（Screenplay 三層，見下）
-docs/       spec 與實作計畫
+  shared/   data model (zod), applyCommand, board health analysis, Markdown export, WS protocol
+  server/   BoardStore (JSON persistence), REST + WebSocket, MCP server
+  web/      React + Tailwind + dnd-kit board UI
+e2e/        Playwright: AI ↔ browser sync, manual editing, drag-and-drop, undo/redo (Screenplay pattern)
+docs/       spec and implementation plan
 ```
 
-### E2E 測試架構
-
-E2E 測試採用 _BDD in Action_（第二版）「可攜式測試自動化」的三層架構，以輕量版 Screenplay Pattern 實作：
-
-```
-e2e/
-  *.spec.ts       規格層：只用業務語言描述誰做了什麼、看到什麼
-  domain/         領域層：Task（tasks.ts）與 Question（questions.ts）
-  integration/    整合層：Ability，唯一知道 DOM（browse-the-web.ts）與 MCP（call-mcp-tools.ts）的地方
-  screenplay.ts   核心：Actor、Ability、task()、question()
-  fixtures.ts     角色：human（瀏覽器）與 ai（MCP），共用同一塊 board
-```
-
-```ts
-await ai.attemptsTo(AddRule('Rule A', { examples: ['Example 1'] }), AddRule('Rule B'));
-await human.attemptsTo(MoveExample('Example 1').toTheRule('Rule B'));
-await ai.sees(TheRules.examplesOf('Rule B')).toEqual(['Example 1']);
-```
-
-- 每個 Task／Question 用 `via(Ability, …)` 列出各介面的實作，執行時依角色擁有的 Ability 選擇：同一個 `AddQuestion('…')`，human 會點 UI，ai 會呼叫 MCP tool。
-- 卡片一律以文字指稱；需要 id 時（MCP）由整合層從 `get_board` 查出。
-- `actor.sees(question)` 是會重試的斷言（`expect.poll`），所以 Question 只回傳當下快照、不等待。
-- 新增測試時：先找 `domain/` 是否已有對應的 Task／Question；新的 DOM locator 放在 `BoardScreen`（`integration/browse-the-web.ts`），不要寫進 spec。
-
-### 資料存在哪裡？
-
-每個修改都會立即寫入 `DATA_DIR`（預設 `<repo>/boards`）。如果重啟後內容「不見了」，先檢查：
-
-1. Server 啟動時印出的 `Data dir:` 是否是你預期的目錄。
-2. Port 4319 上是不是別的 server：`lsof -nP -iTCP:4319 -sTCP:LISTEN`。
-
-Undo 歷史只存在記憶體，重啟後清空（board 內容不受影響）。
-
-### 安全性
-
-Server 只綁定 `127.0.0.1`，並拒絕 Host / Origin 不是 localhost 的 HTTP 與 WebSocket 請求，
-避免惡意網頁透過瀏覽器（DNS rebinding、跨站 WebSocket）操作你的畫板。
+See [docs/spec.md](docs/spec.md) for the design. The E2E architecture is documented in
+[README.zh-TW.md](README.zh-TW.md#e2e-測試架構).
