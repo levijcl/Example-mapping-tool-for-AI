@@ -123,3 +123,7 @@ docs/       spec and implementation plan
 
 See [docs/spec.md](docs/spec.md) for the design. The E2E architecture is documented in
 [README.zh-TW.md](README.zh-TW.md#e2e-測試架構).
+
+## License
+
+MIT — see [LICENSE](LICENSE).

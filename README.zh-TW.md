@@ -133,3 +133,7 @@ Undo 歷史只存在記憶體，重啟後清空（board 內容不受影響）。
 
 Server 只綁定 `127.0.0.1`，並拒絕 Host / Origin 不是 localhost 的 HTTP 與 WebSocket 請求，
 避免惡意網頁透過瀏覽器（DNS rebinding、跨站 WebSocket）操作你的畫板。
+
+## 授權
+
+MIT，詳見 [LICENSE](LICENSE)。
